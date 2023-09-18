@@ -1,0 +1,257 @@
+import pygame
+import sys
+import math
+import random
+
+# Inicializa o pygame
+pygame.init()
+
+# Configurações
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+VERDE_AZULADO = (30, 120, 120)
+VERDE = (0, 255, 0)
+MARROM = (139, 69, 19)
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Jogo do Pantano")
+artpixel = pygame.image.load("artpixel.png")
+mapa = pygame.image.load("mapa_pantano.png")
+
+MARGEM = 0 # Distância da borda da tela em que o barco começa a se mover ao invés do mapa.
+
+barcos = {
+    "prata": pygame.image.load("barco_prata.png"),
+    "azul": pygame.image.load("barco_azul.png"),
+    "amarelo": pygame.image.load("barco_amarelo.png"),
+    "vermelho": pygame.image.load("barco_vermelho.png"),
+}
+jacares_imgs = {
+    "jacare_maior": pygame.image.load("jacare_maior.png"),
+    "jacare_intermediario1": pygame.image.load("jacare_intermediario1.png"),
+    "jacare_intermediario2": pygame.image.load("jacare_intermediario2.png"),
+    "jacare_menor": pygame.image.load("jacare_menor.png"),
+}
+
+def calcular_angulo_entre_pontos(x1, y1, x2, y2):
+    return math.degrees(math.atan2(y2 - y1, x2 - x1))
+
+class Jacare:
+    def __init__(self, x1, y1, imagem):
+        self.angulo = 180
+        self.x = x1
+        self.y = y1
+        self.imagem = imagem
+
+        if imagem == jacares_imgs["jacare_maior"]:
+            self.velocidade = .5
+            self.vida = 140
+        elif imagem == jacares_imgs["jacare_intermediario2"]:
+            self.velocidade = .7
+            self.vida = 120
+        elif imagem == jacares_imgs["jacare_intermediario1"]:
+            self.velocidade = 1
+            self.vida = 80
+        elif imagem == jacares_imgs["jacare_menor"]:
+            self.velocidade = 1.2
+            self.vida = 40
+
+
+    def perseguir(self, x_alvo, y_alvo):
+        angulo2 = math.atan2(y_alvo - self.y, x_alvo - self.x)
+        self.x += self.velocidade * math.cos(angulo2)
+        self.y += self.velocidade * math.sin(angulo2)
+        self.angulo = calcular_angulo_entre_pontos(self.x, self.y, x_alvo, y_alvo)
+        return self
+
+    def desenhar(self, x_offset, y_offset):
+        rotated2 = pygame.transform.rotate(self.imagem,
+                                           -self.angulo)  # Nota: O sinal negativo é porque o eixo y do Pygame é invertido
+        new_rect2 = rotated2.get_rect(center=self.imagem.get_rect(topleft=(self.x, self.y)).center)
+        screen.blit(rotated2, (new_rect2.topleft[0] - x_offset, new_rect2.topleft[1] - y_offset))
+
+
+def gerar_jacare_aleatorio():
+    # Probabilidades ajustadas para gerar diferentes tipos de jacarés
+    tipos = ["jacare_menor"] * 50 + ["jacare_intermediario1"] * 30 + ["jacare_intermediario2"] * 15 + ["jacare_maior"] * 5
+    tipo = random.choice(tipos)
+    x2 = random.randint(0, 10000)
+    y2 = random.randint(0, 10000)
+    jacareq = Jacare(x2, y2, jacares_imgs[tipo])
+    return jacareq
+
+def desenhar_barras_de_vida(jacares2, x_offset, y_offset):
+    for jacare2 in jacares2:
+        xr = jacare2.x - x_offset
+        yr = jacare2.y - y_offset - 10  # Posicione a barra acima do jacaré
+        largura_barra = 40  # Largura da barra de vida fixa
+        altura_barra = 5  # Altura da barra de vida
+
+        # Calcule a largura da barra com base na vida do jacaré
+        largura_atual = int((jacare2.vida / 140) * largura_barra)  # 140 é a vida máxima do jacaré maior
+
+        # Desenhe a barra de vida (por exemplo, verde para vida cheia, vermelho para vida baixa)
+        pygame.draw.rect(screen, (255, 0, 0), (xr, yr, largura_barra, altura_barra))  # Barra vermelha
+        pygame.draw.rect(screen, (0, 255, 0), (xr, yr, largura_atual, altura_barra))  # Barra verde
+
+
+posicao_barco = [SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2]
+posicao_mapa = [5000 - SCREEN_WIDTH // 2, 5000 - SCREEN_HEIGHT // 2]
+velocidade = 3
+cor_atual = random.choice(list(barcos.keys()))
+balas = []
+angulo = 90
+jacares = [gerar_jacare_aleatorio() for _ in range(20)]
+vida_jogador = 100
+...
+x = int(posicao_barco[0] + posicao_mapa[-0])
+y = int(posicao_barco[1] + posicao_mapa[1])
+
+
+cor_abaixo_do_barco = mapa.get_at((x, y))
+
+running = True
+while running:
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            dx = mx - posicao_barco[0]
+            dy = my - posicao_barco[1]
+            angulo_tiro = math.degrees(math.atan2(-dy, dx))
+            bala = {
+                "pos": [posicao_barco[0], posicao_barco[1]],
+                "dir": [math.cos(math.radians(angulo_tiro)), -math.sin(math.radians(angulo_tiro))],
+                "distancia_percorrida": 0
+            }
+            balas.append(bala)
+
+    # Ajuste de velocidade com base na cor abaixo do barco
+    cor_abaixo_do_barco = mapa.get_at((int(posicao_barco[0] + posicao_mapa[0]), int(posicao_barco[1] + posicao_mapa[1])))
+    if cor_abaixo_do_barco == VERDE:
+        velocidade_atual = 0.2
+    elif cor_abaixo_do_barco == MARROM:
+        velocidade_atual = velocidade / 2
+    else:
+        velocidade_atual = velocidade
+
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_UP] and keys[pygame.K_RIGHT]:
+        angulo = 45
+    elif keys[pygame.K_UP] and keys[pygame.K_LEFT]:
+        angulo = 315
+    elif keys[pygame.K_DOWN] and keys[pygame.K_RIGHT]:
+        angulo = 135
+    elif keys[pygame.K_DOWN] and keys[pygame.K_LEFT]:
+        angulo = 225
+    elif keys[pygame.K_UP]:
+        angulo = 0
+    elif keys[pygame.K_DOWN]:
+        angulo = 180
+    elif keys[pygame.K_LEFT]:
+        angulo = 270
+    elif keys[pygame.K_RIGHT]:
+        angulo = 90
+
+    mover_mapa_x = mover_mapa_y = True
+
+    # ... [restante do código anterior]
+
+    # Dentro do loop principal:
+
+    # Movimento do mapa
+    if keys[pygame.K_LEFT]:
+        posicao_mapa[0] -= velocidade_atual
+    if keys[pygame.K_RIGHT]:
+        posicao_mapa[0] += velocidade_atual
+    if keys[pygame.K_UP]:
+        posicao_mapa[1] -= velocidade_atual
+    if keys[pygame.K_DOWN]:
+        posicao_mapa[1] += velocidade_atual
+
+    # Garantir que o mapa não saia dos limites
+    posicao_mapa[0] = max(0, min(posicao_mapa[0], 10000 - SCREEN_WIDTH))
+    posicao_mapa[1] = max(0, min(posicao_mapa[1], 10000 - SCREEN_HEIGHT))
+
+    # ... [restante do código]
+    screen.blit(mapa, (-posicao_mapa[0], -posicao_mapa[1]))
+    screen.blit(artpixel, (-posicao_mapa[0], -posicao_mapa[1]))
+
+
+
+    cor_abaixo_do_barco = mapa.get_at((x, y))
+    desenhar_barras_de_vida(jacares, posicao_mapa[0], posicao_mapa[1])
+
+
+    for jacare in jacares:
+        jacare.perseguir(posicao_barco[0] + posicao_mapa[0], posicao_barco[1] + posicao_mapa[1]).desenhar(
+            posicao_mapa[0], posicao_mapa[1])
+
+    for bala in balas[:]:
+        # ... (restante do código para movimento e desenho das balas)
+
+        for jacare in jacares[:]:  # Verifique a colisão de cada bala com cada jacaré
+            # ... (restante do código para detecção de colisão e dano)
+
+            if jacare.vida <= 0:
+                jacares.remove(jacare)
+                # Quando um jacaré é eliminado, um novo é gerado
+                novo_jacare = gerar_jacare_aleatorio()
+                jacares.append(novo_jacare)
+    RAIO_BALA = 3  # Adicionado um raio padrão para a bala
+    DANO_BALA = 20  # Dano que a bala causa
+
+    ...
+
+    # Dentro do loop principal:
+    for bala in balas[:]:
+        bala["pos"][0] += bala["dir"][0] * 10
+        bala["pos"][1] += bala["dir"][1] * 10
+        bala["distancia_percorrida"] += 10
+        pygame.draw.circle(screen, (0, 0, 0), (int(bala["pos"][0]), int(bala["pos"][1])), RAIO_BALA)
+
+
+        for jacare in jacares[:]:  # Verifique a colisão de cada bala com cada jacaré
+            dist_bala_jacare = math.hypot(jacare.x - bala["pos"][0] - posicao_mapa[0],
+                                          jacare.y - bala["pos"][1] - posicao_mapa[1])
+            if dist_bala_jacare < RAIO_BALA + 20:  # Supondo que 20 é metade do tamanho do jacaré
+                jacare.vida -= DANO_BALA  # Reduzir a vida do jacaré
+                balas.remove(bala)  # Remover a bala que atingiu o jacaré
+                break  # Sair do loop interno, já que a bala foi removida
+
+        if bala["distancia_percorrida"] >= 190:
+            balas.remove(bala)
+
+    for jacare in jacares[:]:  # Agora, verifique se o jacaré ainda está vivo
+        if jacare.vida <= 0:
+            jacares.remove(jacare)
+
+    for jacare in jacares:
+        jacare.perseguir(posicao_barco[0] + posicao_mapa[0], posicao_barco[1] + posicao_mapa[1]).desenhar(posicao_mapa[0], posicao_mapa[1])
+
+        dist = math.hypot(jacare.x - (posicao_barco[0] + posicao_mapa[0]), jacare.y - (posicao_barco[1] + posicao_mapa[1]))
+        if dist < 50:
+            if jacare.imagem == jacares_imgs["jacare_maior"]:
+                vida_jogador -= 30
+            elif jacare.imagem == jacares_imgs["jacare_intermediario1"] or jacare.imagem == jacares_imgs["jacare_intermediario2"]:
+                vida_jogador -= 20
+            elif jacare.imagem == jacares_imgs["jacare_menor"]:
+                vida_jogador -= 10
+            jacares.remove(jacare)
+
+    rotated = pygame.transform.rotate(barcos[cor_atual], -angulo)
+    new_rect = rotated.get_rect(center=barcos[cor_atual].get_rect(center=(posicao_barco[0], posicao_barco[1])).center)
+    screen.blit(rotated, new_rect.topleft)
+
+
+    pygame.draw.rect(screen, (255, 0, 0), (10, 10, 200, 20))
+    pygame.draw.rect(screen, (0, 255, 0), (10, 10, 2 * vida_jogador, 20))
+
+
+    pygame.display.flip()
+    pygame.time.Clock().tick()
+
+
+pygame.quit()
+sys.exit()
